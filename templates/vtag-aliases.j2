@@ -1,0 +1,17 @@
+# Exim4 Domain Aliases file for {{ item.key }}
+
+# The standard aliases for any domain:
+{% for valias in exim_all_domain_aliases %}
+{% if item.value.local_aliases[valias] is not defined %}
+{{ valias }}:	postmaster
+{% else %}
+# {{ valias }} is overriden by a local alias
+{% endif %}
+{% endfor %}
+
+{% if item.value.local_aliases is defined %}
+{% for valias, vto in item.value.local_aliases.items() %}
+{{ valias }}:	{{ vto }}
+{% endfor %}
+{% endif %}
+

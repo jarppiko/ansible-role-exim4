@@ -1,0 +1,19 @@
+---
+dependencies: []
+
+galaxy_info:
+  author: rivimey
+  description: Exim for RedHat/CentOS or Debian/Ubuntu.
+  license: "license (BSD, MIT)"
+  min_ansible_version: 1.8
+  platforms:
+    - name: Debian
+      versions:
+      - all
+    - name: Ubuntu
+      versions:
+      - all
+  galaxy_tags:
+    - networking
+    - system
+    - mail

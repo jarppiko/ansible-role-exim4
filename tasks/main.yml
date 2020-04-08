@@ -1,0 +1,131 @@
+---
+- name: Ensure exim is installed.
+  package:
+    name: exim4
+    state: present
+
+- name: Delete unused config files from Debian setup
+  file:
+    state: absent
+    path: "{{ exim_config_dir }}/{{item}}"
+  loop:
+    - exim4.conf.template
+    - update-exim4.conf.conf
+    - conf.d
+  tags:
+    - exim
+    - exim_users
+
+- name: Ensure greylist files in place
+  copy:
+    src: exim-greylist.conf.inc
+    dest: "{{ exim_config_dir }}/exim-greylist.conf.inc"
+    owner: root
+    group: root
+    mode: u=rw,go=r
+  notify: restart exim
+  tags:
+    - exim
+    - exim_users
+
+- name: Ensure local user files exist for each domain
+  template:
+    src: vtag-imap-users.j2
+    dest: "{{ exim_config_dir }}/{{ item.key }}-imap-users"
+    owner: root
+    group: root
+    mode: u=rw,go=r
+  with_dict: "{{ exim_virtual_domains }}"
+  tags:
+    - exim
+    - exim_users
+
+
+- name: Ensure local black/white lists exist
+  template:
+    src: "{{ item }}.j2"
+    dest: "{{ exim_config_dir }}/{{ item }}"
+    owner: root
+    group: root
+    mode: u=rw,go=r
+  loop:
+    - blacklist_hosts
+    - blacklist_senders
+    - whitelist_hosts
+    - whitelist_senders
+    - bad_mailfrom_hosts
+  tags:
+    - exim
+    - exim_lists
+
+- name: Ensure the postmaster address is defined for each domain
+  fail:
+    msg: "Domain {{item.key}} must define a destination for postmaster"
+  when: 'item.value.local_aliases["postmaster"] is not defined and "postmaster" not in item.value.local_users'
+  with_dict: "{{ exim_virtual_domains }}"
+  tags:
+    - exim
+
+- name: Ensure rewrite rules files exist for each domain
+  template:
+    src: vtag-rewrite.j2
+    dest: "{{ exim_config_dir }}/{{ item.key }}-rewrite"
+    owner: root
+    group: root
+    mode: u=rw,go=r
+  when: item.value.rewrites is defined
+  with_dict: "{{ exim_virtual_domains }}"
+  tags:
+    - exim
+    - exim_lists
+
+- name: Ensure aliases files exist for each domain
+  template:
+    src: vtag-aliases.j2
+    dest: "{{ exim_config_dir }}/{{ item.key }}-aliases"
+    owner: root
+    group: root
+    mode: u=rw,go=r
+  with_dict: "{{ exim_virtual_domains }}"
+  tags:
+    - exim
+    - exim_lists
+
+- name: Mailman aliases file
+  copy:
+    content: |
+              mailman:              "|/var/lib/mailman/mail/mailman post mailman"
+              mailman-admin:        "|/var/lib/mailman/mail/mailman admin mailman"
+              mailman-bounces:      "|/var/lib/mailman/mail/mailman bounces mailman"
+              mailman-confirm:      "|/var/lib/mailman/mail/mailman confirm mailman"
+              mailman-join:         "|/var/lib/mailman/mail/mailman join mailman"
+              mailman-leave:        "|/var/lib/mailman/mail/mailman leave mailman"
+              mailman-owner:        "|/var/lib/mailman/mail/mailman owner mailman"
+              mailman-request:      "|/var/lib/mailman/mail/mailman request mailman"
+              mailman-subscribe:    "|/var/lib/mailman/mail/mailman subscribe mailman"
+              mailman-unsubscribe:  "|/var/lib/mailman/mail/mailman unsubscribe mailman"
+    dest: "{{ exim_config_dir }}/mailman-aliases"
+  when: exim_mailman_transport and not exim_deliver_smarthost
+  tags:
+    - exim
+    - exim_mailman
+
+- name: Update Exim configuration.
+  template:
+    src: exim4.conf.j2
+    dest: "{{ exim_config_file }}"
+    owner: root
+    group: root
+    mode: u=rw,go=r
+  notify: restart exim
+  tags:
+    - exim
+
+- name: Ensure exim is started and enabled at boot.
+  service:
+    name: exim4
+    state: "{{ exim_service_state }}"
+    enabled: "{{ exim_service_enabled }}"
+  notify: restart exim
+  tags:
+    - exim

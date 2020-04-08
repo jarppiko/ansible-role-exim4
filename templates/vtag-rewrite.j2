@@ -1,0 +1,7 @@
+# Exim4 Domain Aliases file for {{ item.key }}
+
+{% if item.value.local_rewrites is defined %}
+{% for vrewrite, vto in item.value.local_rewrites.items() %}
+{{ vrewrite }}:	{{ vto }}
+{% endfor %}
+{% endif %}

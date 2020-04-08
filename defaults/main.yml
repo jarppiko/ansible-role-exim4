@@ -1,0 +1,206 @@
+---
+
+exim_service_state: started
+exim_service_enabled: yes
+
+exim_config_dir: /etc/exim4
+exim_config_file: "{{ exim_config_dir }}/exim4.conf"
+
+exim_user_name: Debian-exim
+exim_group_name: Debian-exim
+exim_trusted_user: root
+
+# Totally disables ipv6 use. See also exim_force_ipv4_domains.
+exim_disable_ipv6: false
+exim_local_parts_suffix: yes
+
+# Host addresses on which to listen.
+exim_listen_addresses: [ 127.0.0.1 ]
+
+# TCP/IP ports on which exim should listen for mail
+exim_listen_ports:
+  - 25
+  - 465
+  - 587
+
+# Ports (already in exim_listen_ports) that are TLS by default.
+exim_tls_ports:
+  - 587
+
+#
+exim_auth_store_file: no
+exim_auth_store_mysql: no
+
+# User/password lookup on local mysql server:
+__exim_mysql_database:
+__exim_mysql_table:
+__exim_mysql_user:
+__exim_mysql_password:
+
+exim_mysql_hostname: localhost
+exim_mysql_database:  "{{ __exim_mysql_database }}"
+exim_mysql_table:  "{{ __exim_mysql_table }}"
+exim_mysql_user:  "{{ __exim_mysql_user }}"
+exim_mysql_password: "{{ __exim_mysql_password }}"
+
+exim_server_name: localhost
+
+# Deliver mail using DNS and MX records otherwise only deliver locally.
+exim_deliver_direct: yes
+
+# Deliver mail to a smarthost => No Local users.
+exim_deliver_smarthost: no
+
+# Allow mail delivery to filesystem-local users, Domain Insensitive.
+# If yes, IMAP delivery is disabled.
+exim_deliver_localuser: no
+
+
+# Outgoing SMTP delivery on port 587.
+exim_submission_transport: no
+# Mail delivery to IMAP server.
+exim_imap_transport: no
+# Mailman mailing list integration.
+exim_mailman_transport: no
+# Mail delivery via .forward files (requires local users).
+exim_userforward_transport: no
+# Mail delivery via .Procmail files (requires local users).
+exim_procmail_transport: no
+
+# Smarthost Setup, when exim_deliver_smarthost.
+exim_smarthost_authenticated: false
+exim_smarthost_cred_name: ""
+exim_smarthost_cred_secret: ""
+exim_smarthost_address: post.example.com
+
+exim_mailman_root: /var/lib/mailman
+exim_mailman_domains: []
+
+# Where is local mail delivered: expected to be using LMTP socket.
+# Only if (exim_imap_transport).
+exim_imap_deliver: /var/run/dovecot/lmtp
+
+# Enable sender verify during message accept.
+exim_sender_verify: yes
+
+# Pass the message on to SpamAssassin for spam checking.
+exim_use_spamassassin: yes
+exim_spamcheck_max_size: 4000000
+# Scores are integers in 1/10ths i.e. 20 is score of 2.0. Tests are greater-than.
+exim_spamassassin_greylist_score: 20
+exim_spamassassin_warn_score: 49
+exim_spamassassin_reject_score: 59
+# The value here is the hardcoded default; change only if needed.
+exim_spamd_address: "127.0.0.1 783"
+
+# AV off by default because select and install of scanner is not trivial.
+# Clamd is supported directly; for Sophos you run the cli tool.
+exim_use_antivirus: no
+exim_av_scanner:
+#.. ClamD : clamd:/var/run/clamd.exim/clamd.sock
+#.. Sophos: cmdline:/opt/bin/savscan -archive --all --no-follow-symlinks '%s': found in file:Virus '(.*)' found
+
+# Retry rules. Only a global setting is supported. See exim docs for detail.
+exim_standard_retry_rule: "F,2h,15m; G,16h,1h,1.5; F,4d,6h"
+
+# Aliases and Rewrites added to all domains.
+exim_all_domain_aliases: []
+exim_all_domain_rewrite: []
+
+# Domains that should only be connected to using IPv4 or IPv6
+exim_force_ipv4_domains: []
+exim_force_ipv6_domains: []
+
+# Domain-insensitive host blacklist and sender blacklist.
+exim_all_host_blacklist: []
+exim_all_sender_blacklist: {}
+
+# Domain-insensitive host whitelist and sender whitelist.
+exim_all_host_whitelist: []
+exim_all_sender_whitelist: {}
+
+exim_bad_host_list: []
+
+exim_virtual_domains: {}
+
+#exim_virtual_domains:
+#
+#  exampleorg:
+#    local_users:
+#      - ruth
+#    local_aliases:
+#      - from: postmaster
+#        to: ruth
+#    domains:
+#      - example.org
+#    rewrites:
+#      - from: "*@*.example.org"
+#        to: "${local_part}@example.org"
+#        opts: q
+
+# We accept relay requests only from these networks:
+exim_relay_from_nets:
+  - 127.0.0.1
+
+# We only relay mail to the following domains (in addition to local domains)
+exim_relay_to_domains: []
+
+# Which domain names are condsidered to be local (i.e. can deliver to / send from)
+exim_local_domains: []
+#  - example.org
+
+# Which hosts or email senders will we explicitly accept or deny?
+exim_whitelist_hosts:
+  - "{{ exim_config_dir }}/whitelist_hosts"
+
+exim_blacklist_hosts:
+  - "{{ exim_config_dir }}/blacklist_hosts"
+
+exim_whitelist_sender_file: "{{ exim_config_dir }}/whitelist_senders"
+exim_blacklist_sender_file: "{{ exim_config_dir }}/blacklist_senders"
+
+# Which host "mail from" names do we deny?
+exim_bad_mailfrom_hosts: "{{ exim_config_dir }}/bad_mailfrom_hosts"
+
+# Which hosts should we not bother DNS lookup for? (e.g. bad DNS server)
+exim_no_lookup_hosts: []
+
+# Which hosts should we never greylist (when don't reply but we need the mail)
+exim_no_greylist_hosts: []
+
+# TLS
+exim_tls_certificate: "/etc/letsencrypt/live/{{exim_server_name}}/fullchain.pem"
+exim_tls_privatekey: "/etc/letsencrypt/live/{{exim_server_name}}/privkey.pem"
+
+exim_use_localscan: no
+exim_localscan_function: ""
+
+# Enable/disable (de)MIME facility (for antivirus). Some builds don't include it.
+# Disable if possible.
+exim_use_demime: no
+
+# Enable/disable DKIM checking facility.
+# Enable if possible.
+exim_use_dkim: yes
+
+# Domains we expect to sign mail.
+exim_dkim_known_signers:
+  - gmail.com
+  - paypal.com
+  - ebay.com
+
+
+# DKIM/DMARC config.
+exim_dkim_canon: 'relaxed'
+exim_dkim_selector: 'selector'
+
+# More details:
+exim_message_size_limit: 8M
+exim_intercommand_delay: 0s
+exim_error_delay: 0s
+
+exim_callout_positive_expire: 9d
+exim_callout_negative_expire: 18h
+
+exim_timeout_frozen: 7d
+exim_ignore_bounce_errors: 2d

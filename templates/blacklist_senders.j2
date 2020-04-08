@@ -1,0 +1,5 @@
+# Exim4 Blacklist Senders File
+
+{% for domain in exim_all_sender_blacklist %}
+{{ domain }}: {{ exim_all_sender_blacklist[domain] | join(" : ") }}
+{% endfor %}
