@@ -7,7 +7,7 @@
 - name: Delete unused config files from Debian setup
   file:
     state: absent
-    path: "{{ exim_config_dir }}/{{item}}"
+    path: "{{ exim_config_dir }}/{{ item }}"
   loop:
     - exim4.conf.template
     - update-exim4.conf.conf
@@ -60,7 +60,7 @@
 
 - name: Ensure the postmaster address is defined for each domain
   fail:
-    msg: "Domain {{item.key}} must define a destination for postmaster"
+    msg: "Domain {{ item.key }} must define a destination for postmaster"
   when: 'item.value.local_aliases["postmaster"] is not defined and "postmaster" not in item.value.local_users'
   with_dict: "{{ exim_virtual_domains }}"
   tags:

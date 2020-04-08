@@ -269,11 +269,11 @@ rfc1413_query_timeout = 0s
 # This option unfreezes frozen bounce messages after two days, tries
 # once more to deliver them, and ignores any delivery failures.
 
-ignore_bounce_errors_after = {{exim_ignore_bounce_errors}}
+ignore_bounce_errors_after = {{ exim_ignore_bounce_errors }}
 
 # This option cancels (removes) frozen messages that are older than a week.
 
-timeout_frozen_after = {{exim_timeout_frozen}}
+timeout_frozen_after = {{ exim_timeout_frozen }}
 
 # By default, messages that are waiting on Exim's queue are all held in a
 # single directory called "input" which it itself within Exim's spool
@@ -303,11 +303,11 @@ smtp_accept_queue_per_connection = 0
 accept_8bitmime = true
 
 # callout address verification
-callout_negative_expire = {{exim_callout_negative_expire}}
-callout_positive_expire = {{exim_callout_positive_expire}}
+callout_negative_expire = {{ exim_callout_negative_expire }}
+callout_positive_expire = {{ exim_callout_positive_expire }}
 
-callout_domain_negative_expire = {{exim_callout_negative_expire}}
-callout_domain_positive_expire = {{exim_callout_positive_expire}}
+callout_domain_negative_expire = {{ exim_callout_negative_expire }}
+callout_domain_positive_expire = {{ exim_callout_positive_expire }}
 
 # reject huge messages
 message_size_limit = {{ exim_message_size_limit }}
@@ -649,7 +649,7 @@ acl_check_data:
 
   # Bypass SpamAssassin checks if the message is too large (4 million).
   #
-  accept  condition   = ${if >={$message_size}{ {{exim_spamcheck_max_size}} } {1}}
+  accept  condition   = ${if >={$message_size}{ {{ exim_spamcheck_max_size }} } {1}}
           add_header  = X-Spam-Note: SpamAssassin run bypassed due to message size
           add_header  = Subject: [L] $h_Subject:
 
@@ -1120,8 +1120,8 @@ begin authenticators
 client_auth:
   driver = cram_md5
   public_name = CRAM-MD5
-  client_name = {{exim_smarthost_cred_name}}
-  client_secret = {{exim_smarthost_cred_secret}}
+  client_name = {{ exim_smarthost_cred_name }}
+  client_secret = {{ exim_smarthost_cred_secret }}
 
 {% endif %}
 {% if exim_auth_store_file and not exim_deliver_smarthost %}

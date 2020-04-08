@@ -130,8 +130,8 @@ to set up a mysql database to provide credentials: put details in the __exim* va
     - example.org
     
     # TLS
-    exim_tls_certificate: "/etc/letsencrypt/live/{{exim_server_name}}/fullchain.pem"
-    exim_tls_privatekey: "/etc/letsencrypt/live/{{exim_server_name}}/privkey.pem"
+    exim_tls_certificate: "/etc/letsencrypt/live/{{ exim_server_name }}/fullchain.pem"
+    exim_tls_privatekey: "/etc/letsencrypt/live/{{ exim_server_name }}/privkey.pem"
     
     # Store credentials in a mysql DB.
     exim_auth_store_mysql: yes    

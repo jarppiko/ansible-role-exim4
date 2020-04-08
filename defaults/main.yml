@@ -169,8 +169,8 @@ exim_no_lookup_hosts: []
 exim_no_greylist_hosts: []
 
 # TLS
-exim_tls_certificate: "/etc/letsencrypt/live/{{exim_server_name}}/fullchain.pem"
-exim_tls_privatekey: "/etc/letsencrypt/live/{{exim_server_name}}/privkey.pem"
+exim_tls_certificate: "/etc/letsencrypt/live/{{ exim_server_name }}/fullchain.pem"
+exim_tls_privatekey: "/etc/letsencrypt/live/{{ exim_server_name }}/privkey.pem"
 
 exim_use_localscan: no
 exim_localscan_function: ""
