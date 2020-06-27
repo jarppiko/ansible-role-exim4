@@ -9,6 +9,7 @@
 
 exim_group = {{ exim_user_name }}
 exim_user = {{ exim_group_name }}
+disable_ipv6 = {{ exim_disable_ipv6 }}
 
 DOMAIN_CONFIG_DIR = {{ exim_config_dir }}
 
@@ -27,22 +28,21 @@ add_environment = PATH=/sbin::/usr/sbin::/bin::/usr/bin
 primary_hostname = {{ exim_server_name }}
 smtp_banner = {{ exim_server_name }} ESMTP Exim $version_number $tod_full
 
-disable_ipv6 = {{ exim_disable_ipv6 }}
-
 # The next three settings create two lists of domains and one list of hosts.
 # These lists are referred to later in this configuration using the syntax
 # +local_domains, +relay_to_domains, and +relay_from_hosts, respectively. They
 # are all colon-separated lists:
 
 {% if exim_mailman_transport %}
-domainlist mailman_domains = <; {{ exim_mailman_domains | join(" ; ")  }}
+MAILMAN_LISTS={{ exim_mailman_root }}
+domainlist mailman_domains = <; {{ exim_mailman_domains | join(" ; ") }}
 {% endif %}
 
-domainlist localhost_domains_ipv4 = 0.0.0.0/32 : 127.0.0.0/8
-domainlist localhost_domains_ipv6 = <; 0::0 ; ff80::0
+hostlist   localhost_domains_ipv4 = 0.0.0.0/32 : 127.0.0.0/8
+hostlist   localhost_domains_ipv6 = <; 0::0 ; ff80::0
 
-domainlist rfc1918_apipa_domains_ipv4 = 10.0.0.0/8 : 169.254.0.0/16 : 172.16.0.0/16 : 192.168.32.0/16
-domainlist rfc1918_apipa_domains_ipv6 = <; ff5d::0 ; fd00::0/8 ; fe00::0/8
+hostlist   rfc1918_apipa_domains_ipv4 = 10.0.0.0/8 : 169.254.0.0/16 : 172.16.0.0/16 : 192.168.32.0/16
+hostlist   rfc1918_apipa_domains_ipv6 = <; ff5d::0 ; fd00::0/8 ; fe00::0/8
 
 domainlist local_domains = <; {{ exim_local_domains | join(" ; ")  }}
 
@@ -52,15 +52,16 @@ domainlist relay_to_domains = <; {{ exim_relay_to_domains | join(" ; ")  }}
 domainlist force_ipv4_domains = <; {{ exim_force_ipv4_domains | join(" ; ")  }}
 domainlist force_ipv6_domains = <; {{ exim_force_ipv6_domains | join(" ; ")  }}
 
-hostlist no_lookup_hosts = <; {{ exim_no_lookup_hosts | join(" ; ")  }}
-hostlist whitelist_hosts = <; {{ exim_whitelist_hosts | join(" ; ")  }}
-hostlist blacklist_hosts = <; {{ exim_blacklist_hosts | join(" ; ")  }}
-hostlist no_greylisting  = <; {{ exim_no_greylist_hosts | join(" ; ")  }}
+hostlist   no_lookup_hosts = <; {{ exim_no_lookup_hosts | join(" ; ")  }}
+hostlist   whitelist_hosts = <; {{ exim_whitelist_hosts | join(" ; ")  }}
+hostlist   blacklist_hosts = <; {{ exim_blacklist_hosts | join(" ; ")  }}
+hostlist   no_greylisting  = <; {{ exim_no_greylist_hosts | join(" ; ")  }}
 
 {% for vtag, vdomain in exim_virtual_domains.items()  %}
 domainlist {{ vtag }}_domains = {{ vdomain.domains | join(" : ") }}
 {% endfor %}
 
+{% if exim_use_dkim %}
 # DKIM setup
 DKIM_CANON = {{ exim_dkim_canon }}
 DKIM_SELECTOR = {{ exim_dkim_selector }}
@@ -74,6 +75,8 @@ DKIM_FILE = DOMAIN_CONFIG_DIR/dkim/${lc:${domain:$h_from:}}.pem
 # If key exists then use it, if not don't.
 DKIM_PRIVATE_KEY = ${if exists {DKIM_FILE} {DKIM_FILE} {0} }
 
+KNOWN_DKIM_SIGNERS = = {{ exim_dkim_known_signers | join(" : ")  }}
+{% endif %}
 
 # All three of these lists may contain many different kinds of item, including
 # wildcarded names, regular expressions, and file lookups. See the reference
@@ -84,19 +87,18 @@ acl_smtp_connect = acl_check_connect
 acl_smtp_mail = acl_check_mail
 acl_smtp_rcpt = acl_check_rcpt
 acl_smtp_data = acl_check_data
+
 {% if exim_use_demime %}
 acl_smtp_mime = acl_check_mime
 {% endif %}
+
 {% if exim_use_dkim %}
 acl_smtp_dkim = acl_check_dkim
+dkim_verify_signers = $dkim_signers : KNOWN_DKIM_SIGNERS
 {% endif %}
 
 # You should not change those settings until you understand how ACLs work.
 
-# Verify sites known to sign mail with DKIM
-
-KNOWN_DKIM_SIGNERS = = {{ exim_dkim_known_signers | join(" : ")  }}
-dkim_verify_signers = $dkim_signers : KNOWN_DKIM_SIGNERS
 
 {% if exim_use_antivirus %}
 # If you are running a version of Exim that was compiled with the content-
@@ -837,7 +839,7 @@ smarthost:
   route_data = {{ exim_smarthost_address }}
   no_more
 
-{% else %}
+{% else %} {# not authenticated smarthost #}
 
 # Alternatively, comment out the above router and uncomment this one to
 # route all mail to a smarthost instead of sending it directly to the
@@ -854,20 +856,20 @@ smarthost:
   no_more
 
 {% endif %}
-{% endif %}
+{% endif %} {# smarthost #}
 
 # The remaining routers handle addresses in the local domain(s), that is those
 # domains that are defined by "domainlist local_domains" above.
 
-{% if exim_mailman_transport and not exim_deliver_smarthost %}
-
+{% if exim_mailman_transport == 2 and not exim_deliver_smarthost %}
 # We want this router first in case we have a list named something like
 # mailman-owner
+MAILMAN2_LISTCHK=MAILMAN_LISTS/${lc::local_part}.${domain}/config.pck
 mm21_main_route:
   driver = accept
   domains = +mailman_domains
   local_parts = *
-  require_files = "{{ exim_mailman_root }}/lists/${lc::$local_part}/config.pck"
+  require_files = MAILMAN2_LISTCHK
   transport = mm21_transport
 
 mm21_special_route:
@@ -875,7 +877,7 @@ mm21_special_route:
   domains = +mailman_domains
   local_parts = *
   local_part_suffix = "-bounces:-bounces+*:-confirm+*:-join:-leave:-owner:-request:-admin"
-  require_files = "{{ exim_mailman_root }}/lists/${lc::$local_part}/config.pck"
+  require_files = MAILMAN_LISTS/${lc::$local_part}/config.pck
   transport = mm21_transport
 
 mailman_users:
@@ -888,8 +890,22 @@ mailman_users:
   file_transport = address_file
   pipe_transport = address_pipe
   no_rewrite
-
 {% endif %}
+
+{% if exim_mailman_transport == 3 and not exim_deliver_smarthost %}
+  # The path to the list receipt (used as the required file when
+# matching list addresses)
+MAILMAN3_LISTCHK=MAILMAN_LISTS/${local_part}.${domain}
+
+mailman3_router:
+  driver = accept
+  domains = +mailman_domains
+  require_files = MAILMAN3_LISTCHK
+  local_part_suffix_optional
+  local_part_suffix = "-bounces:-bounces+*:-confirm:-confirm+*:-join:-leave:-owner:-request:-subscribe:-unsubscribe"
+  transport = mailman3_transport
+{% endif %}
+
 {% if exim_userforward_transport and exim_deliver_localuser %}
 
 # This router handles forwarding using traditional .forward files in users'
@@ -993,10 +1009,12 @@ begin transports
 remote_smtp:
   driver = smtp
   helo_data = {{ exim_server_name }}
+{% if exim_use_dkim %}
   dkim_domain = DKIM_DOMAIN
   dkim_selector = DKIM_SELECTOR
   dkim_private_key = DKIM_PRIVATE_KEY 
   dkim_canon = DKIM_CANON
+{% endif %}
 
 {% endif %}
 {% if exim_imap_transport %}
@@ -1032,8 +1050,7 @@ procmail:
   return_output
 
 {% endif %}
-{% if exim_mailman_transport and not exim_deliver_smarthost %}
-
+{% if exim_mailman_transport == 2 and not exim_deliver_smarthost %}
 ## Mailman 2.1 transport
 mm21_transport:
   driver = pipe
@@ -1044,7 +1061,16 @@ mm21_transport:
   home_directory = /usr/lib/mailman
   user = list
   group = list
+{% endif %}
 
+{% if exim_mailman_transport == 3 %}
+mailman3_transport:
+  driver = smtp
+  protocol = lmtp
+  allow_localhost
+  hosts = {{ exim_mailman_transport_host }}
+  port = {{ exim_mailman_transport_port }}
+  rcpt_include_affixes = true
 {% endif %}
 
 # This transport is used for handling pipe deliveries generated by alias or
@@ -1145,7 +1171,7 @@ lookup_cram:
 # use), an authentication ID, and a password. The latter two appear as
 # $auth2 and $auth3 in the configuration and should be checked against a
 # valid username and password. In a real configuration you would typically
-# use $auth2 as a lookup key, and compare $auth3 against the result of the
+# use $auth2 as a lookup key\, and compare $auth3 against the result of the
 # lookup, perhaps using the crypteq{}{} condition.
 
 SQL_AUTH_PLAIN_LOOKUP=SELECT MD5(u.password) \

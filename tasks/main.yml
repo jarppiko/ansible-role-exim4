@@ -18,15 +18,33 @@
 
 - name: Ensure greylist files in place
   copy:
-    src: exim-greylist.conf.inc
-    dest: "{{ exim_config_dir }}/exim-greylist.conf.inc"
+    src: "{{ item }}"
+    dest: "{{ exim_config_dir }}/{{ item }}"
     owner: root
     group: root
     mode: u=rw,go=r
+  with_items:
+    - exim-greylist.conf.inc
+    - mk-greylist.sql
   notify: restart exim
   tags:
     - exim
     - exim_users
+
+- name: Update greylist.conf.inc with configured db file
+  lineinfile:
+    dest: "{{ exim_config_dir }}/exim-greylist.conf.inc"
+    regexp: '^GREYDB=.*'
+    line: "GREYDB={{ exim_greylist_db }}"
+    state: present
+
+- name: Check if greylist_db itself is present.
+  stat: "path={{ exim_greylist_db }}"
+  register: greylist_db_file
+
+- name: Initialise greylist DB tables
+  shell: "cat {{ exim_config_dir }}/mk-greylist.sql | sqlite3 {{ exim_greylist_db }}"
+  when: not greylist_db_file.stat.exists
 
 - name: Ensure local user files exist for each domain
   template:
@@ -39,7 +57,6 @@
   tags:
     - exim
     - exim_users
-
 
 - name: Ensure local black/white lists exist
   template:
@@ -105,7 +122,7 @@
               mailman-subscribe:    "|/var/lib/mailman/mail/mailman subscribe mailman"
               mailman-unsubscribe:  "|/var/lib/mailman/mail/mailman unsubscribe mailman"
     dest: "{{ exim_config_dir }}/mailman-aliases"
-  when: exim_mailman_transport and not exim_deliver_smarthost
+  when: exim_mailman_transport == 3 and not exim_deliver_smarthost
   tags:
     - exim
     - exim_mailman

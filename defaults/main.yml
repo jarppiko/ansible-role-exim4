@@ -60,7 +60,7 @@ exim_deliver_localuser: no
 exim_submission_transport: no
 # Mail delivery to IMAP server.
 exim_imap_transport: no
-# Mailman mailing list integration.
+# Mailman mailing list integration: 'no', '2' or '3'
 exim_mailman_transport: no
 # Mail delivery via .forward files (requires local users).
 exim_userforward_transport: no
@@ -75,6 +75,8 @@ exim_smarthost_address: post.example.com
 
 exim_mailman_root: /var/lib/mailman
 exim_mailman_domains: []
+exim_mailman_transport_port: 8024
+exim_mailman_transport_host: localhost
 
 # Where is local mail delivered: expected to be using LMTP socket.
 # Only if (exim_imap_transport).
@@ -167,6 +169,7 @@ exim_no_lookup_hosts: []
 
 # Which hosts should we never greylist (when don't reply but we need the mail)
 exim_no_greylist_hosts: []
+exim_greylist_db: "/var/spool/exim4/db/greylist.db"
 
 # TLS
 exim_tls_certificate: "/etc/letsencrypt/live/{{ exim_server_name }}/fullchain.pem"
