@@ -4,6 +4,14 @@
     name: exim4
     state: present
 
+- name: Ensure sqlite3 is installed (for greylistdb).
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - libsqlite3-0
+    - sqlite3
+
 - name: Delete unused config files from Debian setup
   file:
     state: absent
@@ -31,6 +39,28 @@
     - exim
     - exim_users
 
+# Don't install exim4-base unless we're on a system that groks cron.daily
+- name: Check for cron.daily
+  stat:
+    path: /etc/cron.daily
+  register: cron_daily_dir
+  tags:
+    - exim
+    - exim_cron
+
+# Install fixed exim4-base, so exim_tidydb works with greylist.db present.
+- name: Ensure cron daily script is in place
+  copy:
+    src: "etc/exim4-base"
+    dest: "/etc/cron.daily/exim4-base"
+    owner: root
+    group: root
+    mode: u=rw,go=r
+  when: cron_daily_dir.stat.exists
+  tags:
+    - exim
+    - exim_cron
+
 - name: Update greylist.conf.inc with configured db file
   lineinfile:
     dest: "{{ exim_config_dir }}/exim-greylist.conf.inc"
@@ -45,6 +75,8 @@
 - name: Initialise greylist DB tables
   shell: "cat {{ exim_config_dir }}/mk-greylist.sql | sqlite3 {{ exim_greylist_db }}"
   when: not greylist_db_file.stat.exists
+  tags:
+    - exim
 
 - name: Ensure local user files exist for each domain
   template:
