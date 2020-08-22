@@ -1,6 +1,6 @@
 # Ansible Role: Exim
 
-Installs Exim 4 ESMTP server on Debian/Ubuntu.
+Installs Exim 4 ESMTP server on Debian/Ubuntu, but not using the debian config packaging.
 
 There are three major operational modes this supports:
 
@@ -17,7 +17,7 @@ The role includes support for:
  - integrated spamassassin spam filtering (install SA itself sepatately);
  - integrated GNU 'mailman' routing and delivery;
  - callouts to externally configured virus checking tools such as ClamAV;
- - blacklists and whitelists of both host addresses and sender email addresses;
+ - lists of good and bad senders and hosts;
  - lots more!
 
 ## Requirements
@@ -27,11 +27,22 @@ You may need to open TCP port 25 (and/or 465, 587, dep on services) in your serv
 The role is preconfigured to support spamassassin scanning of incoming mail. Some builds of Exim
 may not include 'spamd' support, or you may not want this, so there is a flag to disable it.
 
-The 
+Dovecot support is present in the sense that there is support to send mail to an LMTP port,
+which dovecot (and cyrus-imapd) like. Local mail files are also supported (set
+exim_deliver_localuser true). For Dovecot, sending mail via LMTP creates the user mailbox, there is
+no need to explicitly define it. For Cyrus, you do have to explicitly create a new user mailbox,
+and that is not done in this role.
+
+There is also support built in for Mailman, both the older MM2 and newer MM3, when the list
+directory tree is visible to Exim (it is used to check which list domains exist). Configuration
+of Mailman itself is not part of this role.
+
+Spamassassin can also be enabled simply, but again configuration of SA itself is not included.
 
 ## Role Variables
 
-Some of the main variables are listed below. See `defaults/main.yml` for the complete list:
+Some of the main variables are listed below. See `defaults/main.yml` for the complete list
+and further documentation.
 
 ### Smarthost mode
 
@@ -39,25 +50,32 @@ This configuration is about as simple as it gets: a basic SMTP-only smarthost se
 for email relaying duties e.g. on a web server or print server. The default listen address is
 the ipv4 localhost, so this server won't get mail from anywhere else.
 
-    exim_server_name: example.org
+    exim_server_name: "{{ hostname_fqdn }}"
     
-    # TCP/IP ports on which exim should listen for mail. Keep things simple on port 25.
+    #    TCP/IP ports to listen for mail. Keep things simple with port 25:
     exim_listen_ports: [ 25 ]
+    #    No listen_ports start off with TLS enabled:
     exim_tls_ports: []
+    #    No local delivery => no local domains.
     exim_local_domains: []
     
-    # These define the basic operation: here, a non-local smarthost.
+    # What to do with incoming mail: here, a non-local smarthost.
+    #    No to sending via MX records to the internet.
     exim_deliver_direct: no
+    #    Yes to smarthost:
     exim_deliver_smarthost: yes
+    #    No local users.
     exim_deliver_localuser: no
     
     # Where is the smarthost?
-    exim_smarthost_authenticated: no
     exim_smarthost_address: post.example.org
+    exim_smarthost_authenticated: no
     
-    # No spamd support.
+    # No local spamd support - assume it's done on the smarthost.
+    # Enable this if your smarthost might get upset with you for sending it spam!
     exim_use_spamassassin: no
     exim_use_dkim: no
+
 
 You can add spamassassin and TLS encryption to this if you need. smarthosts don't support local 
 users, so most other facilities don't make sense.
@@ -67,7 +85,18 @@ users, so most other facilities don't make sense.
 This is a simple server for one domain, listening on both SMTP and TLS ports. You will need
 to set up a mysql database to provide credentials: put details in the __exim* variables.
 
+exim_virtual_domains is a dictionary enumerating the delivery domains names supported by this
+server. At the top level, keys represent the domain name - the code calls it 'vtag'. Within that,
+the key 'domains' lists the actual domains covered. Also the local users, local aliases and address
+rewrites are defined. Without at least one entry here, you have no local users, and so no local
+delivery. A smarthost wants an empty virtual domain setup because it only ever relays mail.
+
+
     exim_server_name: example.org
+    
+    # Which domain names are condsidered to be local (i.e. can deliver to / send from)
+    exim_local_domains:
+    - example.org
     
     # Host addresses on which to listen.
     exim_listen_addresses: 
@@ -89,19 +118,27 @@ to set up a mysql database to provide credentials: put details in the __exim* va
     
     # Mail delivery to IMAP server.
     exim_imap_transport: yes
-        
+    
+    # Where is local mail delivered: expected to be using LMTP socket
+    exim_imap_deliver_socket: /var/run/dovecot/lmtp
+
     # Pass the message on to SpamAssassin for spam checking.
     exim_use_spamassassin: yes
     
-    # Aliases added to all domains.
+    # List of aliases which will all resolve to 'postmaster', which must exist as
+    # an alias or user. This is a shortcut for local system processes that send
+    # informational/system messages. If you need to override them, remove from this
+    # list and include under each domain.
     exim_all_domain_aliases: 
-    - postmaster
-    - abuse
+      - abuse
+      - MAILER-DAEMON
+      - root
+      - bin
     
-    exim_all_sender_blacklist:
+    exim_all_blocked_senders:
       warez.me:        [ noreply ]
     
-    exim_all_sender_whitelist: 
+    exim_all_accepted_senders:
       bloomberg.net:      [ no-reply ]
     
     exim_virtual_domains:
@@ -125,18 +162,14 @@ to set up a mysql database to provide credentials: put details in the __exim* va
             to: "${local_part}@example.org"
             opts: q
     
-    # Which domain names are condsidered to be local (i.e. can deliver to / send from)
-    exim_local_domains:
-    - example.org
-    
     # TLS
-    exim_tls_certificate: "/etc/letsencrypt/live/{{ exim_server_name }}/fullchain.pem"
-    exim_tls_privatekey: "/etc/letsencrypt/live/{{ exim_server_name }}/privkey.pem"
+    exim_tls_certificate_file: "/etc/letsencrypt/live/{{ exim_server_name }}/fullchain.pem"
+    exim_tls_privatekey_file: "/etc/letsencrypt/live/{{ exim_server_name }}/privkey.pem"
     
     # Store credentials in a mysql DB.
     exim_auth_store_mysql: yes    
     
-    # User/password lookup on local mysql server:
+    # User/password lookup on local mysql server. Put definitions of __ variables in the vault.
     exim_mysql_hostname: localhost
     exim_mysql_database:  "{{ __exim_mysql_database }}"
     exim_mysql_table:  "{{ __exim_mysql_table }}"
@@ -148,7 +181,7 @@ to set up a mysql database to provide credentials: put details in the __exim* va
     exim_use_dkim: yes
     
     # Domains we expect to sign mail.
-    exim_dkim_known_signers:
+    exim_dkim_good_signers:
       - gmail.com
       - paypal.com
       - ebay.com
@@ -175,4 +208,5 @@ MIT / BSD
 
 ## Author Information
 
-This role was created 2018-2020 by [Ruth Ivimey-Cook](https://www.ivimey.org/) from an original outline "ansible-exim" by Jeff Geerling.
+This role was created 2018-2020 by [Ruth Ivimey-Cook](https://www.ivimey.org/) from an original
+outline "ansible-exim" by Jeff Geerling.

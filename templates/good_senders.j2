@@ -1,0 +1,5 @@
+# Exim4 Good Senders File
+
+{% for domain in exim_all_accepted_senders %}
+{{ domain }}: {{ exim_all_accepted_senders[domain] | join(" : ") }}
+{% endfor %}

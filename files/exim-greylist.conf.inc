@@ -93,7 +93,7 @@ greylist_mail:
 	log_message = Greylisted <$h_message-id:> from <$sender_address> for offences: ${sg {$acl_m_greylistreasons}{\n}{,}}
 
   # Handle the error case (which should never happen, but would be bad if it did).
-  # First by whining about it in the logs, so the admin can deal with it...
+  # First by whining about it in the logs, so the admin can deal with it...\
   warn   condition = ${if eq {$acl_m_greyexpiry}{} {1}}
          log_message = Greylist insertion failed. Bypassing greylist.
   # ... and then by just accepting the message.
@@ -111,7 +111,7 @@ greylist_mail:
 		  You should wait another ${eval10:$acl_m_greyexpiry-$tod_epoch} seconds.\n\
 		  Reason(s) for greylisting: \n$acl_m_greylistreasons
 
-  # The message was listed but it's been more than five minutes. Accept it now and whitelist
+  # The message was listed but it's been more than five minutes. Accept it now and remember
   # the _original_ sending host by its { IP, HELO } so that we don't delay its mail again.
   warn set acl_m_orighost = ${lookup sqlite {GREYDB SELECT host FROM greylist \
 				WHERE id='${quote_sqlite:$acl_m_greyident}';}{$value}}

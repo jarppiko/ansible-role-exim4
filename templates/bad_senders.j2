@@ -1,0 +1,5 @@
+# Exim4 Blocked Senders File
+
+{% for domain in exim_all_blocked_senders %}
+{{ domain }}: {{ exim_all_blocked_senders[domain] | join(" : ") }}
+{% endfor %}

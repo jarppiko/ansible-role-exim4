@@ -1,5 +1,0 @@
-# Exim4 Whitelist Senders File
-
-{% for domain in exim_all_sender_whitelist %}
-{{ domain }}: {{ exim_all_sender_whitelist[domain] | join(" : ") }}
-{% endfor %}

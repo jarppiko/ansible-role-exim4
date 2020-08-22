@@ -48,10 +48,10 @@ exim_server_name: localhost
 # Deliver mail using DNS and MX records otherwise only deliver locally.
 exim_deliver_direct: yes
 
-# Deliver mail to a smarthost => No Local users.
+# Deliver all mail to a smarthost => No Local users.
 exim_deliver_smarthost: no
 
-# Allow mail delivery to filesystem-local users, Domain Insensitive.
+# Allow mail delivery to filesystem-local users, Virtual-Domains Insensitive.
 # If yes, IMAP delivery is disabled.
 exim_deliver_localuser: no
 
@@ -60,7 +60,7 @@ exim_deliver_localuser: no
 exim_submission_transport: no
 # Mail delivery to IMAP server.
 exim_imap_transport: no
-# Mailman mailing list integration: 'no', '2' or '3'
+# Mailman mailing list integration: 'no', 'v2' or 'v3'
 exim_mailman_transport: no
 # Mail delivery via .forward files (requires local users).
 exim_userforward_transport: no
@@ -73,6 +73,9 @@ exim_smarthost_cred_name: ""
 exim_smarthost_cred_secret: ""
 exim_smarthost_address: post.example.com
 
+# Mailman2 and Mailman3 configuration: where is it, which domains?
+# There is an implicit extra, too: the names of lists themselves are read
+# from filesystem directory names.
 exim_mailman_root: /var/lib/mailman
 exim_mailman_domains: []
 exim_mailman_transport_port: 8024
@@ -80,20 +83,28 @@ exim_mailman_transport_host: localhost
 
 # Where is local mail delivered: expected to be using LMTP socket.
 # Only if (exim_imap_transport).
-exim_imap_deliver: /var/run/dovecot/lmtp
+exim_imap_deliver_socket: /var/run/dovecot/lmtp
 
 # Enable sender verify during message accept.
 exim_sender_verify: yes
 
 # Pass the message on to SpamAssassin for spam checking.
 exim_use_spamassassin: yes
+
+# Messages larger than this are not checked by SA because it would take too
+# long, and most spam is not that big.
 exim_spamcheck_max_size: 4000000
-# Scores are integers in 1/10ths i.e. 20 is score of 2.0. Tests are greater-than.
-exim_spamassassin_greylist_score: 20
-exim_spamassassin_warn_score: 49
-exim_spamassassin_reject_score: 59
+
 # The value here is the hardcoded default; change only if needed.
 exim_spamd_address: "127.0.0.1 783"
+
+# Scores are integers in 1/10ths i.e. 20 is score of 2.0. Tests are greater-than.
+# Greylist (i.e. force a resend; relies on many spam sources not bothering):
+exim_spamassassin_greylist_score: 20
+# Greylist and insert warning visible to users in delivered mail.
+exim_spamassassin_warn_score: 49
+# Reject outright.
+exim_spamassassin_reject_score: 59
 
 # AV off by default because select and install of scanner is not trivial.
 # Clamd is supported directly; for Sophos you run the cli tool.
@@ -105,24 +116,39 @@ exim_av_scanner:
 # Retry rules. Only a global setting is supported. See exim docs for detail.
 exim_standard_retry_rule: "F,2h,15m; G,16h,1h,1.5; F,4d,6h"
 
-# Aliases and Rewrites added to all domains.
+# List of aliases which will all resolve to 'postmaster', which must exist as
+# an alias or user. This is a shortcut for local system processes that send
+# informational/system messages. If you need to override them, remove from this
+# list and include under each domain.
 exim_all_domain_aliases: []
-exim_all_domain_rewrite: []
+#  - root
+#  - abuse
+#  - MAILER-DAEMON
+
 
 # Domains that should only be connected to using IPv4 or IPv6
 exim_force_ipv4_domains: []
 exim_force_ipv6_domains: []
 
-# Domain-insensitive host blacklist and sender blacklist.
-exim_all_host_blacklist: []
-exim_all_sender_blacklist: {}
+# Virtual-Domain-insensitive host blocks and sender blocks.
+exim_all_blocked_hosts: []
+exim_all_blocked_senders: {}
 
-# Domain-insensitive host whitelist and sender whitelist.
-exim_all_host_whitelist: []
-exim_all_sender_whitelist: {}
+# Virtual-Domain-insensitive host accept and sender accept.
+exim_all_accepted_hosts: []
+exim_all_accepted_senders: {}
 
-exim_bad_host_list: []
+# Which host "mail from" names do we deny?
+# This list is in a partial-lsearch file.
+exim_bad_mailfrom_hosts: []
 
+# exim_virtual_domains is a dictionary enumerating the delivery domains names supported by this
+# server. At the top level, keys represent the domain name - the code calls it 'vtag'. Within that,
+# the key 'domains' lists the actual domains covered. Also the local users, local aliases and
+# address rewrites are defined. Without at least one entry here, you have no local users, and so
+# no local delivery. A smarthost wants an empty virtual domain setup because it only ever relays
+# mail.
+# ** Including a domain here is meaningless unless it is listed as a local_domain (see below). **
 exim_virtual_domains: {}
 
 #exim_virtual_domains:
@@ -141,39 +167,68 @@ exim_virtual_domains: {}
 #        opts: q
 
 # We accept relay requests only from these networks:
+# This is an Exim 'Hostlist'.
 exim_relay_from_nets:
   - 127.0.0.1
 
 # We only relay mail to the following domains (in addition to local domains)
+# The value being checked is from the domain part (RHS) of an outgoing email address.
+# This is an Exim 'Domainlist'.
 exim_relay_to_domains: []
+#  - example.net
 
 # Which domain names are condsidered to be local (i.e. can deliver to / send from)
+# The value being checked is from the domain part (RHS) of an incoming email address.
+# This is an Exim 'Domainlist'.
 exim_local_domains: []
 #  - example.org
 
-# Which hosts or email senders will we explicitly accept or deny?
-exim_whitelist_hosts:
-  - "{{ exim_config_dir }}/whitelist_hosts"
+# Which hosts or email hosts will we explicitly accept?
+# The value being checked is from the connection itself.
+# This is an Exim 'Hostlist'.
+exim_good_hosts:
+  - "{{ exim_config_dir }}/good_hosts"
 
-exim_blacklist_hosts:
-  - "{{ exim_config_dir }}/blacklist_hosts"
+# Which hosts or email hosts will we explicitly deny?
+# The value being checked is from the connection itself.
+# This is an Exim 'Hostlist'.
+exim_bad_hosts:
+  - "{{ exim_config_dir }}/bad_hosts"
 
-exim_whitelist_sender_file: "{{ exim_config_dir }}/whitelist_senders"
-exim_blacklist_sender_file: "{{ exim_config_dir }}/blacklist_senders"
+# Which hosts or email senders will we explicitly accept?
+# The value being checked is from the normal Mail headers, From:, Sender: etc.
+# This is an lsearch-able File with one column, the raw sender email.
+exim_good_sender_file: "{{ exim_config_dir }}/good_senders"
+
+# Which hosts or email senders will we explicitly deny?
+# The value being checked is from the normal Mail headers, From:, Sender: etc.
+# This is an lsearch-able File with one column, the raw sender email.
+exim_bad_sender_file: "{{ exim_config_dir }}/bad_senders"
 
 # Which host "mail from" names do we deny?
-exim_bad_mailfrom_hosts: "{{ exim_config_dir }}/bad_mailfrom_hosts"
+# The value being checked is the envelope sender of the mail. Usually you would
+# need to use this only when mail was being spoofed.
+# This is an lsearch-able File with one column, the raw envelope sender email.
+exim_bad_mailfrom_host_file: "{{ exim_config_dir }}/bad_mailfrom_hosts"
 
 # Which hosts should we not bother DNS lookup for? (e.g. bad DNS server)
+# This is an Exim 'Hostlist'.
 exim_no_lookup_hosts: []
 
-# Which hosts should we never greylist (when don't reply but we need the mail)
+# Which hosts should we never greylist (eg when they don't return, but we need the mail).
+# This is an Exim 'Hostlist'.
 exim_no_greylist_hosts: []
+
+# Where is the sqlite3 greylist database file stored?
+# A file path.
 exim_greylist_db: "/var/spool/exim4/db/greylist.db"
 
-# TLS
-exim_tls_certificate: "/etc/letsencrypt/live/{{ exim_server_name }}/fullchain.pem"
-exim_tls_privatekey: "/etc/letsencrypt/live/{{ exim_server_name }}/privkey.pem"
+# TLS certificate for securing connections (e.g. IMAPS, SMTPS, STARTTLS etc)
+# A file path.
+exim_tls_certificate_file: "/etc/letsencrypt/live/{{ exim_server_name }}/fullchain.pem"
+exim_tls_privatekey_file: "/etc/letsencrypt/live/{{ exim_server_name }}/privkey.pem"
+
+
 
 exim_use_localscan: no
 exim_localscan_function: ""
@@ -186,12 +241,13 @@ exim_use_demime: no
 # Enable if possible.
 exim_use_dkim: yes
 
-# Domains we expect to sign mail.
-exim_dkim_known_signers:
+# Domains we expect to sign mail correctly. Mail from these will be rejected if the
+# sig is bad, while others get a demerit via greylisting (and/or spamassassin).
+exim_dkim_good_signers:
   - gmail.com
   - paypal.com
   - ebay.com
-
+exim_dkim_good_signers_file: "{{ exim_config_dir }}/good_signers"
 
 # DKIM/DMARC config.
 exim_dkim_canon: 'relaxed'

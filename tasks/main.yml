@@ -90,7 +90,20 @@
     - exim
     - exim_users
 
-- name: Ensure local black/white lists exist
+- name: Delete legacy files
+  file:
+    state: absent
+    path: "{{ exim_config_dir }}/{{ item }}"
+  loop:
+    - bad_hostlist
+    - blacklist_senders
+    - good_hostlist
+    - whitelist_senders
+  tags:
+    - exim
+    - exim_lists
+
+- name: Ensure local good/bad lists exist
   template:
     src: "{{ item }}.j2"
     dest: "{{ exim_config_dir }}/{{ item }}"
@@ -98,10 +111,10 @@
     group: root
     mode: u=rw,go=r
   loop:
-    - blacklist_hosts
-    - blacklist_senders
-    - whitelist_hosts
-    - whitelist_senders
+    - bad_hosts
+    - bad_senders
+    - good_hosts
+    - good_senders
     - bad_mailfrom_hosts
   tags:
     - exim
@@ -154,7 +167,7 @@
               mailman-subscribe:    "|/var/lib/mailman/mail/mailman subscribe mailman"
               mailman-unsubscribe:  "|/var/lib/mailman/mail/mailman unsubscribe mailman"
     dest: "{{ exim_config_dir }}/mailman-aliases"
-  when: exim_mailman_transport == 3 and not exim_deliver_smarthost
+  when: exim_mailman_transport == "v3" and not exim_deliver_smarthost
   tags:
     - exim
     - exim_mailman

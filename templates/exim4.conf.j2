@@ -53,8 +53,8 @@ domainlist force_ipv4_domains = <; {{ exim_force_ipv4_domains | join(" ; ")  }}
 domainlist force_ipv6_domains = <; {{ exim_force_ipv6_domains | join(" ; ")  }}
 
 hostlist   no_lookup_hosts = <; {{ exim_no_lookup_hosts | join(" ; ")  }}
-hostlist   whitelist_hosts = <; {{ exim_whitelist_hosts | join(" ; ")  }}
-hostlist   blacklist_hosts = <; {{ exim_blacklist_hosts | join(" ; ")  }}
+hostlist   good_hostlist = <; {{ exim_good_hosts | join(" ; ")  }}
+hostlist   bad_hostlist = <; {{ exim_bad_hosts | join(" ; ")  }}
 hostlist   no_greylisting  = <; {{ exim_no_greylist_hosts | join(" ; ")  }}
 
 {% for vtag, vdomain in exim_virtual_domains.items()  %}
@@ -75,10 +75,10 @@ DKIM_FILE = DOMAIN_CONFIG_DIR/dkim/${lc:${domain:$h_from:}}.pem
 # If key exists then use it, if not don't.
 DKIM_PRIVATE_KEY = ${if exists {DKIM_FILE} {DKIM_FILE} {0} }
 
-KNOWN_DKIM_SIGNERS = = {{ exim_dkim_known_signers | join(" : ")  }}
+KNOWN_DKIM_SIGNERS = = {{ exim_dkim_good_signers | join(" : ")  }}
 {% endif %}
 
-# All three of these lists may contain many different kinds of item, including
+# All of these lists may contain many different kinds of item, including
 # wildcarded names, regular expressions, and file lookups. See the reference
 # manual for details. The lists above are used in the access control lists for
 # checking incoming messages. The names of these ACLs are defined here:
@@ -94,7 +94,7 @@ acl_smtp_mime = acl_check_mime
 
 {% if exim_use_dkim %}
 acl_smtp_dkim = acl_check_dkim
-dkim_verify_signers = $dkim_signers : KNOWN_DKIM_SIGNERS
+dkim_verify_signers = $dkim_signers : KNOWN_DKIM_SIGNERS : @@lsearch;{{ exim_good_signers_file }}
 {% endif %}
 
 # You should not change those settings until you understand how ACLs work.
@@ -133,8 +133,8 @@ tls_advertise_hosts = *
 # need the first setting, or in separate files, in which case you need both
 # options.
 
-tls_certificate = {{ exim_tls_certificate }}
-tls_privatekey = {{ exim_tls_privatekey }}
+tls_certificate = {{ exim_tls_certificate_file |default(exim_tls_certificate) }}
+tls_privatekey = {{ exim_tls_privatekey_file   |default(exim_tls_privatekey) }}
 
 {% if exim_auth_store_mysql %}
 # The mysql_servers, pgsql_servers, oracle_servers, or ibase_servers option
@@ -322,7 +322,7 @@ message_size_limit = {{ exim_message_size_limit }}
 begin acl
 
 acl_check_connect:
-  deny    hosts         = +blacklist_hosts
+  deny    hosts         = +bad_hostlist
           message       = Mail not permitted from your IP
   accept
 
@@ -364,16 +364,16 @@ acl_check_mail:
   deny    condition     = ${if eq{$sender_helo_name}{} {1}}
           message       = Nice boys say HELO first
 
-  accept  message       = Accepted: sender is whitelisted
-          log_message   = Mail Accepted from $sender_host_address through sender whitelist entry
-          senders       = @@lsearch;{{ exim_whitelist_sender_file }}
+  accept  message       = Accepted: sender is good
+          log_message   = Mail Accepted from $sender_host_address through sender accept entry
+          senders       = @@lsearch;{{ exim_good_sender_file }}
 
-  # white- and black-lists for hosts (connecting IPs) and senders (MAIL FROM)
+  # lists of good and bad hosts (connecting IPs) and senders (MAIL FROM)
   # that we definitely do or don't want.
 
-  accept  message       = Accepted through host whitelist entry
-          log_message   = Mail Accepted from $sender_host_address through host whitelist entry
-          hosts         = +whitelist_hosts
+  accept  message       = Accepted through host accept entry
+          log_message   = Mail Accepted from $sender_host_address through host accept entry
+          hosts         = +good_hostlist
 
   # Use the lack of reverse DNS to trigger greylisting. Some people
   # even reject for it but that would be a little excessive.
@@ -382,7 +382,7 @@ acl_check_mail:
           set acl_m_greylistreasons = Host $sender_host_address lacks reverse DNS\n$acl_m_greylistreasons
   
   # Deny if the sender is in one of a number of domains I don't want mail from.
-  deny    sender_domains = partial-lsearch;{{ exim_bad_mailfrom_hosts }}
+  deny    sender_domains = partial-lsearch;{{ exim_bad_mailfrom_host_file }}
           message       = Sorry, I do not accept mail from $sender_address.
   
   # ok for now
@@ -463,23 +463,23 @@ acl_check_rcpt:
   accept  local_parts   = postmaster
           domains       = +local_domains
 
-  # white- and black-lists for hosts (connecting IPs) and senders (MAIL FROM)
+  # lists of good and bad hosts (connecting IPs) and senders (MAIL FROM)
   # that we definitely do or don't want.
 
-  accept  message       = Accepted through host whitelist entry
-          log_message   = Mail Accepted from $sender_host_address through host whitelist entry
-          hosts         = +whitelist_hosts
+  accept  message       = Accepted through host accept entry
+          log_message   = Mail Accepted from $sender_host_address through host accept entry
+          hosts         = +good_hostlist
 
-  accept  message       = Accepted through sender whitelist entry
-          log_message   = Mail Accepted from $sender_host_address through sender whitelist entry
-          senders       = @@lsearch;{{ exim_whitelist_sender_file }}
+  accept  message       = Accepted through sender accept entry
+          log_message   = Mail Accepted from $sender_host_address through sender accept entry
+          senders       = @@lsearch;{{ exim_good_sender_file }}
 
   deny    message       = Mail not permitted from sender
-          senders       = @@lsearch;{{ exim_blacklist_sender_file }}
+          senders       = @@lsearch;{{ exim_good_sender_file }}
 
   deny    message       = Mail not permitted from host $sender_host_address.
           log_message   = Mail not permitted from host $sender_host_address.
-          hosts         = +blacklist_hosts
+          hosts         = +bad_hostlist
 
   # Accept if the message comes from one of the hosts for which we are an
   # outgoing relay. It is assumed that such hosts are most likely to be MUAs,
@@ -495,9 +495,9 @@ acl_check_rcpt:
   # actually relaying out from MTAs, you should probably add recipient
   # verification here.
 
-  # Note that, by putting this test before any DNS black list checks, you will
-  # always accept from these hosts, even if they end up on a black list. The
-  # assumption is that they are your friends, and if they get onto a black
+  # Note that, by putting this test before any DNS list checks, you will
+  # always accept from these hosts, even if they end up on a list. The
+  # assumption is that they are your friends, and if they get onto a
   # list, it is a mistake.
 
   accept  hosts       = +relay_from_hosts
@@ -506,7 +506,7 @@ acl_check_rcpt:
   # Accept if the message arrived over an authenticated connection, from
   # any host. Again, these messages are usually from MUAs, so recipient
   # verification is omitted, and submission mode is set. And again, we do this
-  # check before any black list tests.
+  # check before any list tests.
   accept  authenticated = *
           control     = submission
 
@@ -538,12 +538,12 @@ acl_check_rcpt:
   require verify      = recipient
 
   #############################################################################
-  # There are no default checks on DNS black lists because the domains that
+  # There are no default checks on DNS lists because the domains that
   # contain these lists are changing all the time. However, here is an example
-  # of how you can get Exim to perform a DNS black list lookup.
+  # of how you can get Exim to perform a DNS list lookup.
   #
-  # warn    dnslists      = black.list.example
-  #         add_header    = X-Warning: $sender_host_address is in a black list at $dnslist_domain
+  # warn    dnslists      = dns.list.example
+  #         add_header    = X-Warning: $sender_host_address is in a list at $dnslist_domain
   #         log_message   = found in $dnslist_domain
   #
   #############################################################################
@@ -599,22 +599,22 @@ acl_check_data:
   accept   message    = Accepted as local delivery
            hosts      = :
 
-  accept   message    = Accepted through host whitelist entry
-           hosts      = +whitelist_hosts
+  accept   message    = Accepted through host accept entry
+           hosts      = +good_hostlist
 
-  accept   message    = Accepted through whitelist entry
-           senders    = @@lsearch;{{ exim_whitelist_sender_file }}
+  accept   message    = Accepted through inclusion entry
+           senders    = @@lsearch;{{ exim_good_sender_file }}
 
-  # white- and black-lists for hosts (connecting IPs) and senders (MAIL FROM)
+  # lists of good and bad hosts (connecting IPs) and senders (MAIL FROM)
   # that we definitely do or don't want.
 
-  # Note that, by putting this test before any DNS black list checks, you will
-  # always accept from these hosts, even if they end up on a black list. The
-  # assumption is that they are your friends, and if they get onto a black
+  # Note that, by putting this test before any DNS list checks, you will
+  # always accept from these hosts, even if they end up on a list. The
+  # assumption is that they are your friends, and if they get onto a
   # list, it is a mistake.
 
   deny    message     = Mail not permitted from sender
-          senders     = @@lsearch;{{ exim_blacklist_sender_file }}
+          senders     = @@lsearch;{{ exim_good_sender_file }}
 
   accept  message     = Accepted as from relayable host
           hosts       = +relay_from_hosts
@@ -622,7 +622,7 @@ acl_check_data:
   # Accept if the message arrived over an authenticated connection, from
   # any host. Again, these messages are usually from MUAs, so recipient
   # verification is omitted, and submission mode is set. And again, we do this
-  # check before any black list tests.
+  # check before any list tests.
 
   accept  authenticated = *
           message     = Accepted as authenticated
@@ -749,7 +749,7 @@ acl_check_data:
 acl_check_mime:
 
   # File extension filtering.
-  deny    message     = Blacklisted file extension $mime_filename detected
+  deny    message     = Blocked file extension $mime_filename detected
           condition   = ${if match \
                         {${lc:$mime_filename}} \
                         {\N(\.cmd|\.dll|\.url|\.vbs|\.btm|\.prf|\.pif|\.scr|\.lnk|\.msi)$\N} \
@@ -861,7 +861,7 @@ smarthost:
 # The remaining routers handle addresses in the local domain(s), that is those
 # domains that are defined by "domainlist local_domains" above.
 
-{% if exim_mailman_transport == 2 and not exim_deliver_smarthost %}
+{% if exim_mailman_transport == "v2" and not exim_deliver_smarthost %}
 # We want this router first in case we have a list named something like
 # mailman-owner
 MAILMAN2_LISTCHK=MAILMAN_LISTS/${lc::local_part}.${domain}/config.pck
@@ -892,7 +892,7 @@ mailman_users:
   no_rewrite
 {% endif %}
 
-{% if exim_mailman_transport == 3 and not exim_deliver_smarthost %}
+{% if exim_mailman_transport == "v3" and not exim_deliver_smarthost %}
   # The path to the list receipt (used as the required file when
 # matching list addresses)
 MAILMAN3_LISTCHK=MAILMAN_LISTS/${local_part}.${domain}
@@ -1022,7 +1022,7 @@ remote_smtp:
 # This transport is used for delivering messages over LMTP to an IMAP server
 imap_delivery:
   driver = lmtp
-  socket = {{ exim_imap_deliver }}
+  socket = {{ exim_imap_deliver_socket }}
   batch_max = 50
 
 {% endif %}
@@ -1050,7 +1050,7 @@ procmail:
   return_output
 
 {% endif %}
-{% if exim_mailman_transport == 2 and not exim_deliver_smarthost %}
+{% if exim_mailman_transport == "v2" and not exim_deliver_smarthost %}
 ## Mailman 2.1 transport
 mm21_transport:
   driver = pipe
@@ -1063,7 +1063,7 @@ mm21_transport:
   group = list
 {% endif %}
 
-{% if exim_mailman_transport == 3 %}
+{% if exim_mailman_transport == "v3" %}
 mailman3_transport:
   driver = smtp
   protocol = lmtp
