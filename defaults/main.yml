@@ -1,5 +1,12 @@
 ---
 
+exim_packages:
+  - exim4
+
+exim_db_packages:
+  - libsqlite3-0
+  - sqlite3
+
 exim_service_state: started
 exim_service_enabled: yes
 
@@ -160,6 +167,7 @@ exim_virtual_domains: {}
 #      - from: postmaster
 #        to: ruth
 #    domains:
+#      # The first is used to qualify unqualified addresses, ie "jo" to "jo@dom.ain" in some cases.
 #      - example.org
 #    rewrites:
 #      - from: "*@*.example.org"

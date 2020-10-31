@@ -94,7 +94,7 @@ acl_smtp_mime = acl_check_mime
 
 {% if exim_use_dkim %}
 acl_smtp_dkim = acl_check_dkim
-dkim_verify_signers = $dkim_signers : KNOWN_DKIM_SIGNERS : @@lsearch;{{ exim_good_signers_file }}
+dkim_verify_signers = $dkim_signers : KNOWN_DKIM_SIGNERS : @@lsearch;{{ exim_dkim_good_signers_file }}
 {% endif %}
 
 # You should not change those settings until you understand how ACLs work.
@@ -474,8 +474,9 @@ acl_check_rcpt:
           log_message   = Mail Accepted from $sender_host_address through sender accept entry
           senders       = @@lsearch;{{ exim_good_sender_file }}
 
-  deny    message       = Mail not permitted from sender
-          senders       = @@lsearch;{{ exim_good_sender_file }}
+  deny    message       = Mail not permitted from sender.
+          log_message   = Mail not permitted from sender.
+          senders       = @@lsearch;{{ exim_bad_sender_file }}
 
   deny    message       = Mail not permitted from host $sender_host_address.
           log_message   = Mail not permitted from host $sender_host_address.
@@ -595,17 +596,12 @@ acl_check_dkim:
 # extension (WITH_CONTENT_SCAN=yes in Local/Makefile).
 
 acl_check_data:
+
   # Accept mail coming from localhost (non-TCP/IP)
-  accept   message    = Accepted as local delivery
+  accept   message    = Accepted: local delivery
            hosts      = :
 
-  accept   message    = Accepted through host accept entry
-           hosts      = +good_hostlist
-
-  accept   message    = Accepted through inclusion entry
-           senders    = @@lsearch;{{ exim_good_sender_file }}
-
-  # lists of good and bad hosts (connecting IPs) and senders (MAIL FROM)
+  # Lists of good and bad hosts (connecting IPs) and senders (MAIL FROM)
   # that we definitely do or don't want.
 
   # Note that, by putting this test before any DNS list checks, you will
@@ -613,8 +609,14 @@ acl_check_data:
   # assumption is that they are your friends, and if they get onto a
   # list, it is a mistake.
 
+  accept  message    = Accepted through host accept.
+          hosts      = +good_hostlist
+
+  accept  message    = Accepted.
+          senders    = @@lsearch;{{ exim_good_sender_file }}
+
   deny    message     = Mail not permitted from sender
-          senders     = @@lsearch;{{ exim_good_sender_file }}
+          senders     = @@lsearch;{{ exim_bad_sender_file }}
 
   accept  message     = Accepted as from relayable host
           hosts       = +relay_from_hosts
@@ -753,11 +755,11 @@ acl_check_mime:
           condition   = ${if match \
                         {${lc:$mime_filename}} \
                         {\N(\.cmd|\.dll|\.url|\.vbs|\.btm|\.prf|\.pif|\.scr|\.lnk|\.msi)$\N} \
-                     {1}{0}}
+                        {1}{0}}
 
   # File extension filtering.
-  deny message        = Mailserver does not accept Windows executables: resend as zip or tar file.
-       condition      = ${if match \
+  deny    message     = Mailserver does not accept Windows executables: resend as zip or tar file.
+          condition   = ${if match \
                         {${lc:$mime_filename}} \
                         {\N(\.exe|\.com|\.bat)$\N} \
                         {1}{0}}
@@ -823,39 +825,25 @@ dnslookup:
 
 {% endif %}
 {% if exim_deliver_smarthost %}
+
+# Alternatively, comment out the above router and uncomment this one to
+# route all mail to a smarthost instead of sending it directly to the
+# intended recipients. If your smarthost requires authentication, change
+# 'remote_smtp' to 'remote_msa' and set up the 'client_auth' authenticator
+# later in this file. You might need to change the port number in the
+# remote_msa transport.
+
+smarthost:
+  driver = manualroute
+  domains = ! +local_domains
 {% if exim_smarthost_authenticated %}
-
-# Alternatively, comment out the above router and uncomment this one to
-# route all mail to a smarthost instead of sending it directly to the
-# intended recipients. If your smarthost requires authentication, change
-# 'remote_smtp' to 'remote_msa' and set up the 'client_auth' authenticator
-# later in this file. You might need to change the port number in the
-# remote_msa transport.
-
-smarthost:
-  driver = manualroute
-  domains = ! +local_domains
   transport = remote_msa
-  route_data = {{ exim_smarthost_address }}
-  no_more
-
-{% else %} {# not authenticated smarthost #}
-
-# Alternatively, comment out the above router and uncomment this one to
-# route all mail to a smarthost instead of sending it directly to the
-# intended recipients. If your smarthost requires authentication, change
-# 'remote_smtp' to 'remote_msa' and set up the 'client_auth' authenticator
-# later in this file. You might need to change the port number in the
-# remote_msa transport.
-
-smarthost:
-  driver = manualroute
-  domains = ! +local_domains
+{% else %}
   transport = remote_smtp
+{% endif %}
   route_data = {{ exim_smarthost_address }}
   no_more
 
-{% endif %}
 {% endif %} {# smarthost #}
 
 # The remaining routers handle addresses in the local domain(s), that is those
@@ -893,7 +881,7 @@ mailman_users:
 {% endif %}
 
 {% if exim_mailman_transport == "v3" and not exim_deliver_smarthost %}
-  # The path to the list receipt (used as the required file when
+# The path to the list receipt (used as the required file when
 # matching list addresses)
 MAILMAN3_LISTCHK=MAILMAN_LISTS/${local_part}.${domain}
 
@@ -1063,7 +1051,7 @@ mm21_transport:
   group = list
 {% endif %}
 
-{% if exim_mailman_transport == "v3" %}
+{% if exim_mailman_transport == "v3" and not exim_deliver_smarthost %}
 mailman3_transport:
   driver = smtp
   protocol = lmtp

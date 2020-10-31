@@ -1,16 +1,15 @@
 ---
+# Install Exim packages
 - name: Ensure exim is installed.
   package:
-    name: exim4
+    name: "{{ exim_packages }}"
     state: present
 
+# Install packages needed to support greylist DB.
 - name: Ensure sqlite3 is installed (for greylistdb).
   package:
-    name: "{{ item }}"
+    name: "{{ exim_db_packages }}"
     state: present
-  with_items:
-    - libsqlite3-0
-    - sqlite3
 
 - name: Delete unused config files from Debian setup
   file:
@@ -95,9 +94,9 @@
     state: absent
     path: "{{ exim_config_dir }}/{{ item }}"
   loop:
-    - bad_hostlist
+    - blacklist_hosts
     - blacklist_senders
-    - good_hostlist
+    - whitelist_hosts
     - whitelist_senders
   tags:
     - exim

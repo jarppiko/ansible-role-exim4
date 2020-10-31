@@ -93,7 +93,7 @@ greylist_mail:
 	log_message = Greylisted <$h_message-id:> from <$sender_address> for offences: ${sg {$acl_m_greylistreasons}{\n}{,}}
 
   # Handle the error case (which should never happen, but would be bad if it did).
-  # First by whining about it in the logs, so the admin can deal with it...\
+  # First by whining about it in the logs, so the admin can deal with it...
   warn   condition = ${if eq {$acl_m_greyexpiry}{} {1}}
          log_message = Greylist insertion failed. Bypassing greylist.
   # ... and then by just accepting the message.

@@ -1,24 +1,31 @@
 # Ansible Role: Exim
 
-Installs Exim 4 ESMTP server on Debian/Ubuntu, but not using the debian config packaging.
+Installs Exim 4 ESMTP server on Debian/Ubuntu, but does not use the debian config packaging so
+as to keep the config file simple. Adapting the role to other Linux systems shouldn't be very
+hard but has not been done.
 
 There are three major operational modes this supports:
-
  - as a smarthost server, forwarding all mail to another 'smarter' server;
  - as an SMTP server on the internet, using MX records and DKIM;
  - as a local user server, not on the internet;
  
 For both the latter modes you can enable local users via IMAP and LMTP, or using files in a 
-filesystem (old style).
+filesystem (old style). There is some flexibility in how the roles are defined. Smarthosts are
+very useful for systems that might generate mail (e.g. a webserver) but which you don't want
+to be handling mail. They end up as simple store-and-forward systems, adding resilience.
 
 The role includes support for:
 
  - virtual email domains, based on MySQL user authentication;
- - integrated spamassassin spam filtering (install SA itself sepatately);
- - integrated GNU 'mailman' routing and delivery;
+ - support for LMTP email delivery to e.g. Dovecot or Cyrus-IMAPd.
+ - integrated spamassassin spam filtering (install SA sepatately);
+ - integrated GNU 'mailman' routing and delivery  (install MM sepatately);
  - callouts to externally configured virus checking tools such as ClamAV;
  - lists of good and bad senders and hosts;
+ - configurable aliases and rewrites per domain;
+ - fairly advanced anti-spam measures even before SpamAssassin;
  - lots more!
+
 
 ## Requirements
 
@@ -44,7 +51,8 @@ Spamassassin can also be enabled simply, but again configuration of SA itself is
 Some of the main variables are listed below. See `defaults/main.yml` for the complete list
 and further documentation.
 
-### Smarthost mode
+
+### Smarthost Example
 
 This configuration is about as simple as it gets: a basic SMTP-only smarthost server, suitable
 for email relaying duties e.g. on a web server or print server. The default listen address is
@@ -80,15 +88,20 @@ the ipv4 localhost, so this server won't get mail from anywhere else.
 You can add spamassassin and TLS encryption to this if you need. smarthosts don't support local 
 users, so most other facilities don't make sense.
 
-### Single domain Email Server
+
+### Single domain Email Server Example
 
 This is a simple server for one domain, listening on both SMTP and TLS ports. You will need
 to set up a mysql database to provide credentials: put details in the __exim* variables.
 
-exim_virtual_domains is a dictionary enumerating the delivery domains names supported by this
-server. At the top level, keys represent the domain name - the code calls it 'vtag'. Within that,
-the key 'domains' lists the actual domains covered. Also the local users, local aliases and address
-rewrites are defined. Without at least one entry here, you have no local users, and so no local
+exim_virtual_domains is the core dictionary enumerating the delivery domains names supported by
+this server. At the top level, keys represent the domain name - the code calls it 'vtag' and it is
+also used for domain-specific filenames. It should be short and purely alphabetic.
+
+The value for each vtag is itself a dictionary, containing key 'domains' which lists the actual
+domains covered. Also the local users, local aliases and address rewrites are defined.
+
+Without at least one virtual domain item defined, you have no local users, and so no local
 delivery. A smarthost wants an empty virtual domain setup because it only ever relays mail.
 
 
@@ -155,6 +168,7 @@ delivery. A smarthost wants an empty virtual domain setup because it only ever r
             to: john
             
         domains:
+          # The first is used to qualify unqualified addresses, ie "jo" to "jo@dom.ain" in some cases.
           - example.org
           
         rewrites:
@@ -196,9 +210,10 @@ delivery. A smarthost wants an empty virtual domain setup because it only ever r
 No direct dependencies, but you may need to configure:
 
  - mysql or mariadb, for authentication
- - spamassassin
- - ClamAV or equivalent
- - Dovecot or equivalent
+ - spamassassin - generally a good idea even on some smarthosts;
+ - mailman, if using mailing lists;
+ - ClamAV or equivalent, if virus scanning is enabled;
+ - Dovecot or equivalent, if you have local IMAP users.
 
 
 ## License
