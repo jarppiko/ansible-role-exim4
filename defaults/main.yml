@@ -34,7 +34,7 @@ exim_listen_ports:
 exim_tls_ports:
   - 587
 
-#
+# Authentication database options - enable one!
 exim_auth_store_file: no
 exim_auth_store_mysql: no
 
@@ -62,6 +62,9 @@ exim_deliver_smarthost: no
 # If yes, IMAP delivery is disabled.
 exim_deliver_localuser: no
 
+# If set, the root dir of the home directories of virtual users.
+# The actual names are derived: Root/domain/local_part/
+exim_virtual_homes: no
 
 # Outgoing SMTP delivery on port 587.
 exim_submission_transport: no

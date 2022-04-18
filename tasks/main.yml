@@ -80,11 +80,13 @@
 - name: Ensure local user files exist for each domain
   template:
     src: vtag-imap-users.j2
-    dest: "{{ exim_config_dir }}/{{ item.key }}-imap-users"
+    dest: "{{ exim_config_dir }}/{{ vdomain.key }}-imap-users"
     owner: root
     group: root
     mode: u=rw,go=r
   with_dict: "{{ exim_virtual_domains }}"
+  loop_control:
+    loop_var: vdomain
   tags:
     - exim
     - exim_users
@@ -104,8 +106,8 @@
 
 - name: Ensure local good/bad lists exist
   template:
-    src: "{{ item }}.j2"
-    dest: "{{ exim_config_dir }}/{{ item }}"
+    src: "{{ flist }}.j2"
+    dest: "{{ exim_config_dir }}/{{ flist }}"
     owner: root
     group: root
     mode: u=rw,go=r
@@ -115,27 +117,45 @@
     - good_hosts
     - good_senders
     - bad_mailfrom_hosts
+  loop_control:
+    loop_var: flist
   tags:
     - exim
     - exim_lists
 
+- name: Ensure the mail filters are set up for each domain
+  include_tasks: filters.yml
+  vars:
+    domain: "{{ vdomain.value }}"
+  when: 'vdomain.value.local_filters is defined'
+  with_dict: "{{ exim_virtual_domains }}"
+  loop_control:
+    loop_var: vdomain
+  tags:
+    - exim
+    - exim_filter
+
 - name: Ensure the postmaster address is defined for each domain
   fail:
-    msg: "Domain {{ item.key }} must define a destination for postmaster"
-  when: 'item.value.local_aliases["postmaster"] is not defined and "postmaster" not in item.value.local_users'
+    msg: "Domain {{ vdomain.key }} must define a destination for postmaster"
+  when: 'vdomain.value.local_aliases["postmaster"] is not defined and "postmaster" not in vdomain.value.local_users'
   with_dict: "{{ exim_virtual_domains }}"
+  loop_control:
+    loop_var: vdomain
   tags:
     - exim
 
 - name: Ensure rewrite rules files exist for each domain
   template:
     src: vtag-rewrite.j2
-    dest: "{{ exim_config_dir }}/{{ item.key }}-rewrite"
+    dest: "{{ exim_config_dir }}/{{ vdomain.key }}-rewrite"
     owner: root
     group: root
     mode: u=rw,go=r
-  when: item.value.rewrites is defined
+  when: vdomain.value.rewrites is defined
   with_dict: "{{ exim_virtual_domains }}"
+  loop_control:
+    loop_var: vdomain
   tags:
     - exim
     - exim_lists
@@ -143,11 +163,13 @@
 - name: Ensure aliases files exist for each domain
   template:
     src: vtag-aliases.j2
-    dest: "{{ exim_config_dir }}/{{ item.key }}-aliases"
+    dest: "{{ exim_config_dir }}/{{ vdomain.key }}-aliases"
     owner: root
     group: root
     mode: u=rw,go=r
   with_dict: "{{ exim_virtual_domains }}"
+  loop_control:
+    loop_var: vdomain
   tags:
     - exim
     - exim_lists

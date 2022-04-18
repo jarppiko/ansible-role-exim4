@@ -1,5 +1,5 @@
-# Exim4 Domain Local IMAP Users file for {{ item.key }}
+# Exim4 Domain Local IMAP Users file for {{ vdomain.key }}
 
-{% for vuser in item.value.local_users %}
+{% for vuser in vdomain.value.local_users %}
 {{ vuser }}
 {% endfor %}

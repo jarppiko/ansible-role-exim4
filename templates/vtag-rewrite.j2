@@ -1,7 +1,7 @@
-# Exim4 Domain Address Rewrite file for {{ item.key }}
+# Exim4 Domain Address Rewrite file for {{ vdomain.key }}
 
-{% if item.value.local_rewrites is defined %}
-{% for vrewrite, vto in item.value.local_rewrites.items() %}
+{% if vdomain.value.local_rewrites is defined %}
+{% for vrewrite, vto in vdomain.value.local_rewrites.items() %}
 {{ vrewrite }}:	{{ vto }}
 {% endfor %}
 {% endif %}
