@@ -1,0 +1,50 @@
+---
+# 'exim_virtual_homes' is the base dir
+# 'domain' is the exim domain record that includes this filter
+# 'filters' is a list of filter definitions, including:
+#      - domain: ivimey.org
+#        local: gers
+#        filter: |
+#        message_name: autoreply.msg
+#        message: |
+
+- name: Define the filter directory
+  set_fact:
+    filterdir: "{{ exim_virtual_homes }}/{{ filter.domain }}/{{ filter.local }}"
+
+- name: Ensure the filter directory exists
+  file:
+    dest: "{{ item }}"
+    state: directory
+    mode: 0770
+    owner: dovecot
+    group: mail
+  loop:
+    - "{{ exim_virtual_homes }}"
+    - "{{ exim_virtual_homes }}/{{ filter.domain }}"
+    - "{{ exim_virtual_homes }}/{{ filter.domain }}/{{ filter.local }}"
+
+- name: Ensure the log file exists
+  file:
+    dest: "{{ filterdir }}/filter.log"
+    state: file
+    mode: 0644
+
+- name: Ensure the filter rule is in place.
+  copy:
+    content: "{{ filter.filter }}"
+    dest: "{{ filterdir }}/filter"
+    owner: mail
+    group: mail
+    mode: 0644
+  when: filter.filter is defined
+
+- name: Ensure the filter message is in place.
+  copy:
+    content: "{{ filter.message }}"
+    dest: "{{ filterdir }}/{{ filter.message_name }}"
+    owner: mail
+    group: mail
+    mode: 0644
+  when: filter.message is defined and filter.message_name is defined
+

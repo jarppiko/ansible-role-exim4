@@ -1,0 +1,15 @@
+---
+# 'exim_virtual_homes' is the base dir
+# 'domain' is the exim domain record
+# 'filters' is a list of filter definitions, including:
+#      - domain: ivimey.org
+#        local: gers
+#        filter: |
+#        message_name: autoreply.msg
+#        message: |
+
+- name: Ensure the mail filters are set up for each domain
+  include_tasks: filter.yml
+  with_items: "{{ domain.local_filters }}"
+  loop_control:
+    loop_var: filter
