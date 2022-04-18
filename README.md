@@ -17,6 +17,7 @@ to be handling mail. They end up as simple store-and-forward systems, adding res
 The role includes support for:
 
  - virtual email domains, based on MySQL user authentication;
+ - basic support for creating exim mail filters and setting virtual-homedirs;
  - support for LMTP email delivery to e.g. Dovecot or Cyrus-IMAPd.
  - integrated spamassassin spam filtering (install SA sepatately);
  - integrated GNU 'mailman' routing and delivery  (install MM sepatately);
@@ -36,7 +37,7 @@ may not include 'spamd' support, or you may not want this, so there is a flag to
 
 Dovecot support is present in the sense that there is support to send mail to an LMTP port,
 which dovecot (and cyrus-imapd) like. Local mail files are also supported (set
-exim_deliver_localuser true). For Dovecot, sending mail via LMTP creates the user mailbox, there is
+exim\_deliver\_localuser true). For Dovecot, sending mail via LMTP creates the user mailbox, there is
 no need to explicitly define it. For Cyrus, you do have to explicitly create a new user mailbox,
 and that is not done in this role.
 
