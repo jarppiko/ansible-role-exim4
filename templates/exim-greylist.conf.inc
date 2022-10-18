@@ -8,9 +8,9 @@
 # UPDATING TO EXIM 4.94+
 # ======================
 #
-# Previous versions of this ACL specified the sqlite database filename
-# in the sqlite lookup strings directly, but since Exim 4.94 is it no
-# longer permitted to mix "tainted" text which comes from the message
+# Previous versions of this ACL specified the sqlite database filename 
+# in the sqlite lookup strings directly, but since Exim 4.94 is it no 
+# longer permitted to mix "tainted" text which comes from the message 
 # itself, with the filename. Thus, you now have to set
 #
 # sqlite_dbfile = /var/db/mta-greylist.db
@@ -24,7 +24,7 @@
 # First set sqlite_dbfile in the main configuration file to point to
 # the greylist sqlite database, as described above.
 #
-# In your main ACLs, gather reason(s) for greylisting into a variable
+# In your main ACLs, gather reason(s) for greylisting into a variable 
 # named $acl_m_greylistreasons before invoking this ACL with
 # 'require acl = greylist_mail'. The reasons should be separate lines
 # of text, and will be reported in the SMTP rejection message as well
@@ -48,7 +48,7 @@
 # by a tuple of their IP address and the name they used in HELO.
 #
 # We also include the time of listing for 'known resenders', just in case
-# someone wants to expire them after a certain amount of time. So the
+# someone wants to expire them after a certain amount of time. So the 
 # database table for these 'known resenders' looks like this:
 #
 # CREATE TABLE resenders (
@@ -59,7 +59,7 @@
 #
 # To remember mail we've rejected, we create an 'identity' from its sender
 # and recipient addresses and its Message-ID: header. We don't include the
-# sending IP address in the identity, because sometimes the second and
+# sending IP address in the identity, because sometimes the second and 
 # subsequent attempts may come from a different IP address to the original.
 #
 # We do record the original IP address and HELO name though, because if
@@ -110,7 +110,7 @@ greylist_mail:
          acl = write_known_resenders
 
   # If the mail isn't already the database -- i.e. if the $acl_m_greyexpiry
-  # variable we just looked up is empty -- then try to add it now. This is
+  # variable we just looked up is empty -- then try to add it now. This is 
   # where the 2 minute timeout is set ($tod_epoch + 120), should you wish
   # to change it.
   warn  condition = ${if eq {$acl_m_greyexpiry}{} {1}}

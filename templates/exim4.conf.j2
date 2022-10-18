@@ -18,6 +18,7 @@ DOMAIN_CONFIG_DIR = {{ exim_config_dir }}
 # $VMAIL_HOMES/$domain/$local_part/
 VMAIL_HOMES = {{ exim_virtual_homes }}
 {% endif %}
+sqlite_dbfile = /var/spool/exim4/db/greylist.db
 
 keep_environment = HOME : LANG : USER
 add_environment = PATH=/sbin::/usr/sbin::/bin::/usr/bin
@@ -785,6 +786,10 @@ acl_check_mime:
 # An address is passed to each router in turn until it is accepted.  #
 ######################################################################
 
+BADCHARS = \N[^A-Za-z0-9_.-]+\N
+SAFELOCALPART = ${sg{$local_part}{BADCHARS}{_}}
+SAFEDOMAIN = ${sg{$domain}{BADCHARS}{_}}
+
 begin routers
 
 {% if exim_deliver_direct and exim_virtual_homes %}
@@ -793,12 +798,12 @@ virtual_filter:
   driver = redirect
   allow_filter
   no_check_local_user
-  condition = ${if exists{VMAIL_HOMES/${domain}/${local_part}/filter}{yes}{no}}
+  condition = ${if exists{VMAIL_HOMES/SAFEDOMAIN/SAFELOCALPART/filter}{yes}{no}}
   domains = +local_domains
-  router_home_directory = VMAIL_HOMES/${domain}/${local_part}
+  router_home_directory = VMAIL_HOMES/SAFEDOMAIN/SAFELOCALPART
   user = mail
   group = mail
-  file = VMAIL_HOMES/${domain}/${local_part}/filter
+  file = VMAIL_HOMES/SAFEDOMAIN/SAFELOCALPART/no-filter
   reply_transport = address_reply
   file_transport = address_file
   pipe_transport = address_pipe
