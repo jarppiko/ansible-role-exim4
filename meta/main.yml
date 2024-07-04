@@ -2,23 +2,25 @@
 dependencies: []
 
 galaxy_info:
-
   author: rivimey
   description: Exim 4 ESMTP server setup for Debian/Ubuntu.
   license: "license (BSD, MIT)"
-  min_ansible_version: 2.4
+  min_ansible_version: "2.4"
 
   platforms:
     - name: Debian
       versions:
-      - buster
-      - jessie
+        - buster
+        - jessie
 
     - name: Ubuntu
       versions:
-      - trusty
-      - xenial
-      - bionic
+        - trusty
+        - xenial
+        - bionic
+        - focal
+        - jammy
+        - noble
 
   galaxy_tags:
     - networking
