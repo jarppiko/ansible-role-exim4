@@ -1,2 +1,6 @@
 *.retry
 tests/test.sh
+
+# VS Code
+/.vscode/
+*.code-workspace
